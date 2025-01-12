@@ -1,0 +1,24 @@
+[package]
+name = "inspect"
+version = "0.0.0"
+edition = "2021"
+authors = ["ickk <crates@ickk.io>"]
+publish = false
+
+[lints]
+workspace = true
+
+[features]
+default = ["derive"]
+derive = ["dep:inspect_derive"]
+
+[dependencies]
+inspect_derive = { workspace = true, optional = true }
+
+disqualified = "1.0.0"
+memoffset = "0.9.1"
+parking_lot = "0.12.3"
+
+[dev-dependencies]
+inspect_derive.workspace = true
+paste.workspace = true

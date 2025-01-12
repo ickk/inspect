@@ -1,0 +1,14 @@
+[workspace]
+resolver = "2"
+members = ["inspect", "inspect_derive"]
+
+[workspace.lints]
+rust.unsafe_op_in_unsafe_fn = "deny"
+clippy.new_without_default = "allow"
+
+[workspace.dependencies]
+inspect.path = "./inspect"
+inspect_derive.path = "./inspect_derive"
+
+memoffset = "0.9.1"
+paste = "1.0.15"
