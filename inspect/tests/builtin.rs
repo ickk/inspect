@@ -140,3 +140,17 @@ fn type_id_matches_result_ref_u8_non_static() {
     TypeId::of::<Result<&'static u8, &'static u8>>(),
   )
 }
+
+assert_type_id_matches! { type tuple_1 = ((),) }
+assert_type_id_matches! { type tuple_2 = ((), bool) }
+assert_type_id_matches! { type tuple_3 = ((), bool, u8) }
+assert_type_id_matches! { type tuple_4 = ((), bool, u8, u16) }
+assert_type_id_matches! { type tuple_5 = ((), bool, u8, u16, u32) }
+assert_type_id_matches! { type tuple_6 = ((), bool, u8, u16, u32, u64) }
+assert_type_id_matches! { type tuple_7 = ((), bool, u8, u16, u32, u64, u128) }
+assert_type_id_matches! {
+  type tuple_8 = ((), bool, u8, u16, u32, u64, u128, usize)
+}
+assert_type_id_matches! {
+  type tuple_tuple = ((u8, i8), (usize, isize))
+}

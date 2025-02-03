@@ -11,8 +11,8 @@ lifetime parameters; In the latter case the `TypeId` collected corresponds to
 the `'static` version of the given type.
 
 For now it is implemented for common primitive types, including numerics,
-pointers, references, slices, and some types from `std` like `Option`,
-`Result`, `Vec`, `PhantomData`, &c.
+pointers, references, slices, tuples (up to *8-tuples*) and some types from
+`std` like `Vec`, `PhantomData`, `Option`, `Result`, &c.
 
 `TypeInfo` contains the type_name, size, align, and `TypeId` of a types. For
 structs the names, offsets, and types of fields are available. For types like
@@ -28,11 +28,7 @@ struct Child<T>(usize, Option<Box<str>>, Box<[T]>);
 
 let type_info = TypeInfo::of::<MyStruct<u32>>();
 assert_eq!(
-  format!(
-    "size: {size:?}, align: {align:?}",
-    size = type_info.size(),
-    align = type_info.align()
-  ),
+  format!("size: {:?}, align: {:?}", type_info.size(), type_info.align()),
   "size: Some(40), align: Some(8)"
 );
 assert_eq!(
@@ -46,14 +42,9 @@ assert_eq!(
 )",
   );
 
-use ::core::marker::PhantomData;
 let type_info = TypeInfo::of::<[&'static Vec<u8>]>();
 assert_eq!(
-  format!(
-    "size: {size:?}, align: {align:?}",
-    size = type_info.size(),
-    align = type_info.align()
-  ),
+  format!("size: {:?}, align: {:?}", type_info.size(), type_info.align()),
   "size: None, align: None",
 );
 assert_eq!(
@@ -61,13 +52,10 @@ assert_eq!(
   "[&Vec<u8>]",
 );
 
+use ::core::marker::PhantomData;
 let type_info = TypeInfo::of::<PhantomData<Vec<usize>>>();
 assert_eq!(
-  format!(
-    "size: {size:?}, align: {align:?}",
-    size = type_info.size(),
-    align = type_info.align()
-  ),
+  format!("size: {:?}, align: {:?}", type_info.size(), type_info.align()),
   "size: Some(0), align: Some(1)",
 );
 assert_eq!(

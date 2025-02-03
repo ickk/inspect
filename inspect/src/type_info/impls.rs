@@ -275,3 +275,74 @@ where
     })
   }
 }
+
+// does not support tuples with unsized last element - this is probably not
+// possible without specialisation, or giving up `SizedInfo`. Maybe it's
+// possible to abuse existing specialisation such as array-specialisation to
+// optionally provide `SizedInfo`?
+macro_rules! impl_type_info_tuple {
+  ($($index:literal:$generic:ident),+) => {
+    unsafe impl<$($generic,)+> ProviderOfTypeInfo<($($generic,)+)>
+    for Provider<($($generic,)+)>
+    where
+      $($generic: Sized,)+
+      $(Provider<$generic>: ProviderOfTypeInfo<$generic>,)+
+    {
+      type StaticTy = ($(
+        <Provider<$generic> as ProviderOfTypeInfo<$generic>>::StaticTySized,
+      )+);
+      type StaticTySized = ($(
+        <Provider<$generic> as ProviderOfTypeInfo<$generic>>::StaticTySized,
+      )+);
+
+      fn type_info() -> &'static TypeInfo {
+        use {
+          crate::type_info::internal::ConcurrentMap,
+          ::core::{
+            any::{type_name, TypeId},
+            mem::{align_of, offset_of, size_of},
+          },
+        };
+
+        static DICTIONARY: ConcurrentMap<TypeId, &'static TypeInfo> =
+          ConcurrentMap::new();
+
+        let type_id = TypeId::of::<Self::StaticTy>();
+        DICTIONARY.get_or_insert_with(type_id, || {
+          let field_infos = Box::leak(
+            vec![$(
+              AnonymousFieldInfo {
+                field_index: $index,
+                field_offset: offset_of!(Self::StaticTy, $index),
+                type_info_fn: Provider::<$generic>::type_info,
+              },)+
+            ]
+            .into_boxed_slice(),
+          );
+
+          let info = TypeInfo::Tuple(Tuple::Tuple {
+            id: IdInfo {
+              type_id,
+              type_name: type_name::<($($generic,)+)>(),
+            },
+            sized: SizedInfo {
+              size: size_of::<($($generic,)+)>(),
+              align: align_of::<($($generic,)+)>(),
+            },
+            info: TupleInfo { field_infos },
+          });
+          Box::leak(Box::new(info))
+        })
+      }
+    }
+  };
+}
+
+impl_type_info_tuple! { 0:A }
+impl_type_info_tuple! { 0:A, 1:B }
+impl_type_info_tuple! { 0:A, 1:B, 2:C }
+impl_type_info_tuple! { 0:A, 1:B, 2:C, 3:D }
+impl_type_info_tuple! { 0:A, 1:B, 2:C, 3:D, 4:E }
+impl_type_info_tuple! { 0:A, 1:B, 2:C, 3:D, 4:E, 5:F }
+impl_type_info_tuple! { 0:A, 1:B, 2:C, 3:D, 4:E, 5:F, 6:G }
+impl_type_info_tuple! { 0:A, 1:B, 2:C, 3:D, 4:E, 5:F, 6:G, 7:H }
