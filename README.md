@@ -1,5 +1,5 @@
 > *Do you think God stays in heaven because he too lives in fear of what he's
-created?* ~ Spy Kids 2
+> created?* ~ Spy Kids 2
 
 `inspect`
 ---------
