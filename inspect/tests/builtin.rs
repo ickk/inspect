@@ -105,3 +105,38 @@ fn type_id_matches_slice_ref_mut_u8_non_static() {
     TypeId::of::<&'static mut [&'static mut u8]>()
   );
 }
+
+#[test]
+fn type_id_matches_result_u8_usize() {
+  assert_eq!(
+    TypeInfo::of::<Result<u8, usize>>().type_id(),
+    TypeId::of::<Result<u8, usize>>(),
+  )
+}
+
+#[test]
+fn type_id_matches_result_ref_u8_non_static() {
+  fn fallible<'a, 'b>(a: &'a u8, b: &'b u8) -> Result<&'a u8, &'b u8> {
+    if (a & b) == 0 {
+      Ok(a)
+    } else {
+      Err(b)
+    }
+  }
+
+  let a = Box::new(1);
+  let b = Box::new(2);
+  let o = fallible(&a, &b);
+  assert_eq!(
+    TypeInfo::of_val(&o).type_id(),
+    TypeId::of::<Result<&'static u8, &'static u8>>(),
+  );
+
+  let a = Box::new(1);
+  let b = Box::new(2);
+  let e = fallible(&a, &b);
+  assert_eq!(
+    TypeInfo::of_val(&e).type_id(),
+    TypeId::of::<Result<&'static u8, &'static u8>>(),
+  )
+}

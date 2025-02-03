@@ -1,10 +1,6 @@
 use {
   super::*,
-  ::core::{
-    any::{type_name, TypeId},
-    marker::PhantomData,
-    option::Option,
-  },
+  ::core::{marker::PhantomData, option::Option},
   ::std::vec::Vec,
 };
 
@@ -72,7 +68,10 @@ macro_rules! impl_type_info_sized_with_item {
       fn type_info() -> &'static TypeInfo {
         use {
           crate::type_info::internal::ConcurrentMap,
-          ::core::mem::{align_of, size_of},
+          ::core::{
+            mem::{align_of, size_of},
+            any::{type_name, TypeId},
+          },
         };
 
         static DICTIONARY: ConcurrentMap<TypeId, &'static TypeInfo> =
@@ -126,7 +125,10 @@ macro_rules! impl_type_info_sized_with_unsized_item {
       fn type_info() -> &'static TypeInfo {
         use {
           crate::type_info::internal::ConcurrentMap,
-          ::core::mem::{align_of, size_of},
+          ::core::{
+            mem::{align_of, size_of},
+            any::{type_name, TypeId},
+          }
         };
 
         static DICTIONARY: ConcurrentMap<TypeId, &'static TypeInfo> =
@@ -194,7 +196,10 @@ macro_rules! impl_type_info_unsized_with_item {
       type StaticTySized = ();
 
       fn type_info() -> &'static TypeInfo {
-        use crate::type_info::internal::ConcurrentMap;
+        use {
+          crate::type_info::internal::ConcurrentMap,
+          ::core::any::{type_name, TypeId},
+        };
 
         static DICTIONARY: ConcurrentMap<TypeId, &'static TypeInfo> =
           ConcurrentMap::new();
@@ -220,4 +225,53 @@ macro_rules! impl_type_info_unsized_with_item {
 impl_type_info_unsized_with_item! {
   <T> [T] as TypeInfo::Sequence(Sequence::Slice);
   type StaticTy = [<Provider<T> as ProviderOfTypeInfo<T>>::StaticTySized];
+}
+
+unsafe impl<O, E> ProviderOfTypeInfo<Result<O, E>> for Provider<Result<O, E>>
+where
+  O: Sized,
+  E: Sized,
+  Provider<O>: ProviderOfTypeInfo<O>,
+  Provider<E>: ProviderOfTypeInfo<E>,
+{
+  type StaticTy = Result<
+    <Provider<O> as ProviderOfTypeInfo<O>>::StaticTySized,
+    <Provider<E> as ProviderOfTypeInfo<E>>::StaticTySized,
+  >;
+  type StaticTySized = Result<
+    <Provider<O> as ProviderOfTypeInfo<O>>::StaticTySized,
+    <Provider<E> as ProviderOfTypeInfo<E>>::StaticTySized,
+  >;
+
+  fn type_info() -> &'static TypeInfo {
+    use {
+      crate::type_info::internal::ConcurrentMap,
+      ::core::{
+        any::{type_name, TypeId},
+        mem::{align_of, size_of},
+      },
+    };
+
+    static DICTIONARY: ConcurrentMap<TypeId, &'static TypeInfo> =
+      ConcurrentMap::new();
+
+    let type_id = TypeId::of::<Self::StaticTy>();
+    DICTIONARY.get_or_insert_with(type_id, || {
+      let info = TypeInfo::Std(Std::Result {
+        id: IdInfo {
+          type_id,
+          type_name: type_name::<Result<O, E>>(),
+        },
+        sized: SizedInfo {
+          size: size_of::<Result<O, E>>(),
+          align: align_of::<Result<O, E>>(),
+        },
+        info: ResultInfo {
+          ok_type_info_fn: Provider::<O>::type_info,
+          err_type_info_fn: Provider::<E>::type_info,
+        },
+      });
+      Box::leak(Box::new(info))
+    })
+  }
 }
