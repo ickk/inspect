@@ -21,7 +21,6 @@ pub enum TypeInfo {
   Sequence(Sequence),
   Std(Std),
   Tuple(Tuple),
-
   Struct(Struct),
   Enum(Enum),
 }

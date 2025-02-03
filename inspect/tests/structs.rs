@@ -5,7 +5,6 @@ struct UnitStruct;
 
 #[derive(TypeInfo)]
 struct TupleStruct(&'static str, usize, f32);
-
 #[derive(TypeInfo)]
 struct TupleStructWithLifetime<'a, 'b, 'c>(&'a u8, &'b u8, &'c u8);
 
@@ -13,18 +12,32 @@ struct TupleStructWithLifetime<'a, 'b, 'c>(&'a u8, &'b u8, &'c u8);
 struct RegularStruct {
   optional_child: &'static Option<Child>,
 }
-
 #[derive(TypeInfo)]
 struct Child {
   usize_field: usize,
   optional_boxed_str: Option<Box<str>>,
 }
+#[derive(TypeInfo)]
+struct RegularStructWithLifetimes<'s, 't> {
+  a: &'s u8,
+  b: &'t str,
+}
 
 #[derive(TypeInfo)]
 struct GenericTupleStruct<A, B>(A, B, B, A);
-
 #[derive(TypeInfo)]
 struct GenericTupleStructWithLifetime<'a, 'b, A, B>(&'a A, &'b B);
+
+#[derive(TypeInfo)]
+struct GenericRegularStruct<A, B> {
+  b: B,
+  a: A,
+}
+#[derive(TypeInfo)]
+struct GenericRegularStructWithLifetime<'a, 'b, A, B> {
+  b: &'b B,
+  a: &'a A,
+}
 
 #[test]
 fn type_id_matches_unit_struct() {
@@ -64,6 +77,21 @@ fn type_id_matches_regular_struct() {
     TypeInfo::of::<RegularStruct>().type_id(),
     TypeId::of::<RegularStruct>(),
   );
+}
+
+#[test]
+fn type_id_matches_regular_struct_with_lifetime() {
+  {
+    let a: &u8 = &Box::new(1);
+    let b: &str = &"Bamboo".to_string();
+
+    let s = RegularStructWithLifetimes { a, b };
+
+    assert_eq!(
+      TypeInfo::of_val(&s).type_id(),
+      TypeId::of::<RegularStructWithLifetimes<'static, 'static>>(),
+    )
+  }
 }
 
 #[test]
@@ -112,6 +140,59 @@ fn type_id_matches_generic_tuple_struct_with_lifetime() {
       TypeInfo::of_val(&s).type_id(),
       TypeId::of::<T<'static, 'static>>()
     );
+  }
+}
 
+#[test]
+fn type_id_matches_generic_regular_struct() {
+  {
+    let a: &usize = &Box::new(1usize);
+    let b: u8 = 5;
+
+    let s: T = GenericRegularStruct { a, b };
+    type T<'a> = GenericRegularStruct<&'a usize, u8>;
+
+    assert_eq!(TypeInfo::of_val(&s).type_id(), TypeId::of::<T<'static>>());
+  }
+
+  {
+    let inner_a: &usize = &Box::new(1usize);
+    let inner_b: u8 = 5;
+
+    let a: usize = 10;
+    let b: &GenericRegularStruct<&usize, u8> =
+      &Box::new(GenericRegularStruct {
+        a: inner_a,
+        b: inner_b,
+      });
+
+    let s: T = GenericRegularStruct { a, b };
+    type T<'b, 'inner_a> = GenericRegularStruct<
+      usize,
+      &'b GenericRegularStruct<&'inner_a usize, u8>,
+    >;
+
+    assert_eq!(
+      TypeInfo::of_val(&s).type_id(),
+      TypeId::of::<T<'static, 'static>>()
+    );
+
+    eprintln!("\n{:#}", TypeInfo::of_val(&s));
+  }
+}
+
+#[test]
+fn type_id_matches_generic_regular_struct_with_lifetime() {
+  {
+    let a: &u8 = &Box::new(1);
+    let b: &u8 = &2;
+
+    let s: T = GenericRegularStructWithLifetime { a: &a, b: &b };
+    type T<'a, 'b> = GenericRegularStructWithLifetime<'a, 'b, &'a u8, &'b u8>;
+
+    assert_eq!(
+      TypeInfo::of_val(&s).type_id(),
+      TypeId::of::<T<'static, 'static>>()
+    );
   }
 }

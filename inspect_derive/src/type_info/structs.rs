@@ -109,7 +109,6 @@ pub fn derive_tuple_struct(
               #(AnonymousFieldInfo {
                 field_index: #field_indices,
                 field_offset: offset_of!(#full_name_static, #field_indices),
-                // type_info_fn: (&&&Specialise::<#field_types>::new()).type_info_fn(),
                 type_info_fn: Provider::<#field_types_static>::type_info,
               }),*
             ].into_boxed_slice()
@@ -302,7 +301,6 @@ pub fn derive_generic_tuple_struct(
               #(AnonymousFieldInfo {
                 field_index: #field_indices,
                 field_offset: offset_of!(#full_name, #field_indices),
-                // autoderef specialisation doesn't work in generic context :(
                 type_info_fn: Provider::<#field_types>::type_info,
               }),*
             ].into_boxed_slice(),
@@ -350,22 +348,41 @@ pub fn derive_generic_struct(
     .named
     .iter()
     .map(|field| field.ident.as_ref().unwrap().to_string());
+
   let generic_types = generics
     .type_params()
     .map(|param| param.ident.clone())
     .collect::<Vec<_>>();
-  let full_name = quote!(#name<#(#generic_types),*>);
+  let generic_lifetimes = generics
+    .lifetimes()
+    .map(|param| param.lifetime.clone())
+    .collect::<Vec<_>>();
+  let static_lifetimes = generic_lifetimes
+    .iter()
+    .map(|_| Lifetime::new("'static", Span::call_site()));
+
+  let full_name = quote!(#name<#(#generic_lifetimes,)* #(#generic_types),*>);
+
+  let static_ty_sized = quote!(
+    #name<
+      #(#static_lifetimes,)*
+      #(
+      <::inspect::type_info::internal::Provider<#generic_types> as
+      ::inspect::type_info::internal::ProviderOfTypeInfo<#generic_types>>::StaticTySized
+      ),*
+    >
+  );
 
   quote! {
-    unsafe impl<#(#generic_types),*> ::inspect::type_info::internal::ProviderOfTypeInfo<#full_name>
+    unsafe impl<#(#generic_lifetimes,)* #(#generic_types),*> ::inspect::type_info::internal::ProviderOfTypeInfo<#full_name>
     for ::inspect::type_info::internal::Provider<#full_name>
     where #(
-      ::inspect::type_info::internal::Provider<#generic_types>:
-      ::inspect::type_info::internal::ProviderOfTypeInfo<#generic_types> + 'static
+      #generic_types: Sized,
+      ::inspect::type_info::internal::Provider<#generic_types>: ::inspect::type_info::internal::ProviderOfTypeInfo<#generic_types>
     ),*
     {
-      type StaticTy = #full_name;
-      type StaticTySized = #full_name;
+      type StaticTy = #static_ty_sized;
+      type StaticTySized = #static_ty_sized;
 
       fn type_info() -> &'static ::inspect::TypeInfo {
         use {
@@ -379,10 +396,10 @@ pub fn derive_generic_struct(
           },
         };
 
-        static DICTIONARY: ConcurrentMap<TypeId, &'static TypeInfo> =
-          ConcurrentMap::new();
+        static DICTIONARY: ConcurrentMap<TypeId, &'static TypeInfo>
+          = ConcurrentMap::new();
 
-        let type_id = TypeId::of::<#full_name>();
+        let type_id = TypeId::of::<Self::StaticTy>();
         DICTIONARY.get_or_insert_with(type_id, || {
           let field_infos: &'static [NamedFieldInfo] = Box::leak(
             vec![

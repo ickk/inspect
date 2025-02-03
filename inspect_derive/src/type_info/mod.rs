@@ -39,7 +39,7 @@ pub fn derive(tokens: TokenStream) -> TokenStream {
         },
       },
       Data::Enum(_data_enum) => {
-        todo!()
+        todo!("enums derives are not implemented yet")
       },
       _ => panic!("Not supported"),
     };

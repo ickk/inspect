@@ -245,7 +245,7 @@ impl ::core::fmt::Display for TypeInfo {
           set.finish()
         },
       },
-      TypeInfo::Enum(..) => todo!(),
+      TypeInfo::Enum(..) => todo!("enum Display impl is not complete yet"),
     }
   }
 }

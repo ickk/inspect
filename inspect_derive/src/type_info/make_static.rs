@@ -6,6 +6,7 @@ use {
   },
 };
 
+// replaces any named lifetimes in a `syn::Type` with `'static`
 pub fn make_static(ty: &mut Type) {
   fn make_static_angle_bracketed(args: &mut AngleBracketedGenericArguments) {
     for arg in &mut args.args {
@@ -43,14 +44,14 @@ pub fn make_static(ty: &mut Type) {
     }
   }
   fn make_static_parenthesized(_args: &mut ParenthesizedGenericArguments) {
-    todo!()
+    todo!("make_static is not complete yet")
   }
   fn make_static_bound(bound: &mut TypeParamBound) {
     match bound {
       TypeParamBound::Lifetime(l) => {
         *l = Lifetime::new("'static", Span::call_site())
       },
-      _ => todo!(),
+      _ => todo!("make_static is not complete yet"),
     }
   }
 
