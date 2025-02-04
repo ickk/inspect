@@ -296,6 +296,10 @@ macro_rules! impl_type_info_tuple {
       )+);
 
       fn type_info() -> &'static TypeInfo {
+        // ensure the indices are monotonically increasing from 0
+        // I'd guess the compiler probably will remove this
+        [$($index ),+].iter().copied().enumerate().for_each(|(e, i)| assert_eq!(e, i));
+
         use {
           crate::type_info::internal::ConcurrentMap,
           ::core::{

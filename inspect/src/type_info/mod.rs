@@ -27,6 +27,7 @@ pub enum TypeInfo {
 
 #[derive(Debug)]
 #[expect(non_camel_case_types)]
+#[non_exhaustive]
 pub enum Primitive {
   u8,
   u16,
@@ -52,6 +53,7 @@ pub enum Primitive {
 
 #[derive(Debug)]
 #[allow(non_camel_case_types)]
+#[non_exhaustive]
 pub enum Sequence {
   str,
   Slice {
@@ -67,6 +69,7 @@ pub enum Sequence {
 }
 
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Std {
   Vec {
     id: IdInfo,
@@ -92,6 +95,7 @@ pub enum Std {
 }
 
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Pointer {
   Ref {
     id: IdInfo,
@@ -121,6 +125,7 @@ pub enum Pointer {
 }
 
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Tuple {
   Tuple {
     id: IdInfo,
@@ -130,6 +135,7 @@ pub enum Tuple {
 }
 
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Struct {
   UnitStruct {
     id: IdInfo,
@@ -148,6 +154,7 @@ pub enum Struct {
 }
 
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Enum {
   Enum {
     id: IdInfo,

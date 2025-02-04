@@ -1,9 +1,15 @@
-use super::{Pointer, Sequence, Std, Struct, Tuple, TypeInfo};
+use {
+  super::{
+    Enum, EnumInfo, EnumVariantInfo, Pointer, Sequence, Std, Struct, Tuple,
+    TypeInfo,
+  },
+  ::core::fmt,
+};
 
 // The precision controls how many levels of pointers are followed; avoiding
 // infinite recursion on circular types.
-impl ::core::fmt::Display for TypeInfo {
-  fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+impl fmt::Display for TypeInfo {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     let alternate = f.alternate();
     let precision = f.precision().unwrap_or(10);
     let short_name = {
@@ -245,7 +251,68 @@ impl ::core::fmt::Display for TypeInfo {
           set.finish()
         },
       },
-      TypeInfo::Enum(..) => todo!("enum Display impl is not complete yet"),
+      TypeInfo::Enum(Enum::Enum {
+        variants: EnumInfo { variant_infos },
+        ..
+      }) => {
+        struct DisplayVariant<'v>(&'v EnumVariantInfo);
+        impl<'v> fmt::Display for DisplayVariant<'v> {
+          fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            let precision = f.precision().unwrap();
+            match self.0 {
+              EnumVariantInfo::Unit { variant_name, .. } => {
+                f.write_str(variant_name)
+              },
+              EnumVariantInfo::Tuple {
+                variant_name,
+                field_infos,
+                ..
+              } => {
+                let mut tuple = f.debug_tuple(variant_name);
+                for field in field_infos.iter() {
+                  tuple.field(&format_args!(
+                    "/*{}*/ {:.*}",
+                    field.field_offset,
+                    precision,
+                    (field.type_info_fn)(),
+                  ));
+                }
+                tuple.finish()
+              },
+              EnumVariantInfo::Struct {
+                variant_name,
+                field_infos,
+                ..
+              } => {
+                let mut structure = f.debug_struct(variant_name);
+                for field in field_infos.iter() {
+                  structure.field(
+                    field.field_name,
+                    &format_args!(
+                      "/*{}*/ {:.*}",
+                      field.field_offset,
+                      precision,
+                      (field.type_info_fn)(),
+                    ),
+                  );
+                }
+                structure.finish()
+              },
+            }
+          }
+        }
+
+        f.write_fmt(format_args!("{short_name} "))?;
+        let mut set = f.debug_set();
+        for variant in variant_infos.iter() {
+          set.entry(&format_args!(
+            "{:.*}",
+            precision,
+            DisplayVariant(variant)
+          ));
+        }
+        set.finish()
+      },
     }
   }
 }

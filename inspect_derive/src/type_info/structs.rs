@@ -2,15 +2,46 @@ use {
   super::make_static::make_static,
   ::proc_macro2::{Span, TokenStream as TokenStream2},
   ::quote::quote,
-  ::syn::{FieldsNamed, FieldsUnnamed, Generics, Ident, Index, Lifetime},
+  ::syn::{
+    DataStruct, Fields, FieldsNamed, FieldsUnnamed, Generics, Ident, Index,
+    Lifetime,
+  },
 };
+
+pub fn derive_struct(
+  name: Ident,
+  generics: Generics,
+  data_struct: &DataStruct,
+) -> TokenStream2 {
+  if generics.const_params().next().is_some() {
+    panic!("Const generics are not supported for structs (yet)");
+  }
+
+  if generics.type_params().next().is_none() {
+    match &data_struct.fields {
+      Fields::Unit => derive_unit_struct(name),
+      Fields::Unnamed(fields) => derive_tuple_struct(name, generics, fields),
+      Fields::Named(fields) => derive_regular_struct(name, generics, fields),
+    }
+  } else {
+    match &data_struct.fields {
+      Fields::Unit => unreachable!("Unit structs can't have generics"),
+      Fields::Unnamed(fields) => {
+        derive_generic_tuple_struct(name, generics, fields)
+      },
+      Fields::Named(fields) => {
+        derive_generic_regular_struct(name, generics, fields)
+      },
+    }
+  }
+}
 
 /// derive implementation for unit structs: i.e.
 ///
 /// ```ignore
 /// struct MyStruct;
 /// ```
-pub fn derive_unit_struct(name: Ident) -> TokenStream2 {
+fn derive_unit_struct(name: Ident) -> TokenStream2 {
   quote! {
     unsafe impl ::inspect::type_info::internal::ProviderOfTypeInfo<#name>
     for ::inspect::type_info::internal::Provider<#name>
@@ -52,7 +83,7 @@ pub fn derive_unit_struct(name: Ident) -> TokenStream2 {
 /// ```ignore
 /// struct MyStruct(A, B);
 /// ```
-pub fn derive_tuple_struct(
+fn derive_tuple_struct(
   name: Ident,
   generics: Generics,
   fields: &FieldsUnnamed,
@@ -143,7 +174,7 @@ pub fn derive_tuple_struct(
 ///   b: B,
 /// }
 /// ```
-pub fn derive_struct(
+fn derive_regular_struct(
   name: Ident,
   generics: Generics,
   fields: &FieldsNamed,
@@ -234,7 +265,7 @@ pub fn derive_struct(
 /// ```ignore
 /// struct MyStruct<A, B>(A, B);
 /// ```
-pub fn derive_generic_tuple_struct(
+fn derive_generic_tuple_struct(
   name: Ident,
   generics: Generics,
   fields: &FieldsUnnamed,
@@ -334,7 +365,7 @@ pub fn derive_generic_tuple_struct(
 ///   b: B,
 /// }
 /// ```
-pub fn derive_generic_struct(
+fn derive_generic_regular_struct(
   name: Ident,
   generics: Generics,
   fields: &FieldsNamed,
