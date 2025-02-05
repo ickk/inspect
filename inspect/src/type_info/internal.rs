@@ -1,6 +1,6 @@
 use {
-  super::TypeInfo,
-  ::core::{hash::Hash, marker::PhantomData},
+  super::{discriminant_erased::DiscriminantErased, TypeInfo},
+  ::core::{hash::Hash, marker::PhantomData, mem::Discriminant},
   ::parking_lot::RwLock,
   ::std::{collections::HashMap, sync::LazyLock},
 };
@@ -9,7 +9,7 @@ use {
 ///
 /// This is important, because we want to implement something like
 /// `A::type_info`, but it is important that we don't unintentionally get the
-/// implementation from a deref target if `impl Deref<B> for A`.
+/// implementation from a deref target.
 pub struct Provider<T: ?Sized>(PhantomData<T>);
 
 /// The trait types implement (through derive macro) when they want to produce
@@ -50,6 +50,9 @@ pub struct Provider<T: ?Sized>(PhantomData<T>);
 /// # Safety
 ///
 /// The implementation on `Provider<Ty>` must accurately reflect `Ty`
+#[diagnostic::on_unimplemented(
+  message = "`{Ty}` does not `#[derive(TypeInfo)]`"
+)]
 pub unsafe trait ProviderOfTypeInfo<Ty: ?Sized> {
   /// the `'static` version of `Ty`
   type StaticTy: ?Sized + 'static;
@@ -57,6 +60,24 @@ pub unsafe trait ProviderOfTypeInfo<Ty: ?Sized> {
   type StaticTySized: Sized + 'static;
 
   fn type_info() -> &'static TypeInfo;
+}
+
+// lol, this garbage automatically associates `Provider<T>` to `T`, so that
+// [`TypeInfo::of`] can have a bound on [`TypeInfoProvider`] rather than having
+// a bound directly on [`ProviderOfTypeInfo`].
+//
+// The motivation is to hide the ugly internal trait (`ProviderOfTypeInfo`),
+// since it has odd things the user shouldn't touch like the associated
+// `StaticTy` types.
+pub(crate) trait AssociatedProvider {
+  type Provider: ProviderOfTypeInfo<Self> + ?Sized;
+}
+impl<T> AssociatedProvider for T
+where
+  T: ?Sized,
+  Provider<T>: ProviderOfTypeInfo<T>,
+{
+  type Provider = Provider<T>;
 }
 
 /// A Hashmap that can be put in a static
@@ -80,4 +101,10 @@ where
     let mut dictionary = self.0.write();
     dictionary.entry(key).or_insert_with(default).clone()
   }
+}
+
+pub fn leak_erase_discriminant<T: 'static>(
+  concrete: Discriminant<T>,
+) -> DiscriminantErased {
+  DiscriminantErased::new_from_concreate(concrete)
 }

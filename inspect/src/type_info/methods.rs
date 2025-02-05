@@ -1,28 +1,9 @@
-use crate::type_info::Tuple;
-
 use super::{
-  internal::{Provider, ProviderOfTypeInfo},
-  Enum, Pointer, Primitive, Sequence, Std, Struct, TypeInfo,
+  DiscriminantErased, Enum, EnumVariantInfo, Pointer, Primitive, Sequence,
+  Std, Struct, Tuple, TypeInfo,
 };
 
 impl TypeInfo {
-  /// Get the `TypeInfo` corresponding to some type `T`
-  pub fn of<T>() -> &'static TypeInfo
-  where
-    T: ?Sized,
-    Provider<T>: ProviderOfTypeInfo<T>,
-  {
-    Provider::<T>::type_info()
-  }
-
-  pub fn of_val<T>(_: &T) -> &'static TypeInfo
-  where
-    T: ?Sized,
-    Provider<T>: ProviderOfTypeInfo<T>,
-  {
-    Provider::<T>::type_info()
-  }
-
   /// The [`TypeId`] of the `'static` version of the type
   ///
   /// [`TypeId`]: ::core::any::TypeId
@@ -82,6 +63,9 @@ impl TypeInfo {
     }
   }
 
+  /// Get the [type name] of the type
+  ///
+  /// [type name]: ::core::any::type_name
   pub fn type_name(&self) -> &'static str {
     use ::core::any::type_name;
 
@@ -140,6 +124,9 @@ impl TypeInfo {
     }
   }
 
+  /// Get the [size] of the type, if it's a statically sized type
+  ///
+  /// [size]: ::core::mem::size_of
   pub fn size(&self) -> Option<usize> {
     use ::core::mem::size_of;
 
@@ -196,6 +183,9 @@ impl TypeInfo {
     }
   }
 
+  /// Get the [align] of the type, if it's a statically sized type
+  ///
+  /// [align]: ::core::mem::align_of
   pub fn align(&self) -> Option<usize> {
     use ::core::mem::align_of;
 
@@ -250,5 +240,31 @@ impl TypeInfo {
         Enum::Enum { sized, .. } => Some(sized.align),
       },
     }
+  }
+
+  /// Get an iterator of [`DiscriminantErased`], the type-erased
+  /// [discriminants], of the type when it is an enum
+  ///
+  /// [discriminants]: ::core::mem::discriminant
+  pub fn discriminants(&self) -> impl Iterator<Item = DiscriminantErased> {
+    match self {
+      TypeInfo::Enum(Enum::Enum { variants, .. }) => variants.variant_infos,
+      _ => &[],
+    }
+    .iter()
+    .map(|info| match info {
+      EnumVariantInfo::Unit {
+        variant_discriminant,
+        ..
+      } => *variant_discriminant,
+      EnumVariantInfo::Tuple {
+        variant_discriminant,
+        ..
+      } => *variant_discriminant,
+      EnumVariantInfo::Struct {
+        variant_discriminant,
+        ..
+      } => *variant_discriminant,
+    })
   }
 }

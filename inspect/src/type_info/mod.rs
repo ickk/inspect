@@ -1,17 +1,53 @@
+mod discriminant_erased;
 mod display;
 mod impls;
 #[doc(hidden)]
 pub mod internal;
 mod methods;
 
+pub use discriminant_erased::DiscriminantErased;
 use {
-  self::internal::{Provider, ProviderOfTypeInfo},
+  self::internal::{AssociatedProvider, Provider, ProviderOfTypeInfo},
   ::core::any::TypeId,
 };
 
 /// Implemented for any type that can provide type info via [`TypeInfo::of`]
-pub trait TypeInfoProvider {}
-impl<T> TypeInfoProvider for T where Provider<T>: ProviderOfTypeInfo<T> {}
+#[allow(private_bounds)]
+pub trait TypeInfoProvider: AssociatedProvider {}
+impl<T> TypeInfoProvider for T
+where
+  T: ?Sized,
+  Provider<T>: ProviderOfTypeInfo<T>,
+{
+}
+
+impl TypeInfo {
+  /// Get the `TypeInfo` corresponding to some type `T`
+  ///
+  /// This method is available any time you have a type `T` that implements
+  /// `TypeInfoProvider`:
+  /// ```rust
+  /// # use ::inspect::type_info::{TypeInfo, TypeInfoProvider};
+  /// fn my_function<T: TypeInfoProvider>() {
+  ///   TypeInfo::of::<T>();
+  /// }
+  /// ```
+  pub fn of<T>() -> &'static TypeInfo
+  where
+    T: ?Sized + TypeInfoProvider,
+  {
+    <T as AssociatedProvider>::Provider::type_info()
+  }
+
+  /// Get the `TypeInfo` corresponding to some type `T`, when you have a
+  /// reference to some extant `&T`.
+  pub fn of_val<T>(_: &T) -> &'static TypeInfo
+  where
+    T: ?Sized + TypeInfoProvider,
+  {
+    <T as AssociatedProvider>::Provider::type_info()
+  }
+}
 
 #[derive(Debug)]
 #[non_exhaustive]
@@ -223,16 +259,28 @@ pub struct EnumInfo {
 pub enum EnumVariantInfo {
   Unit {
     variant_name: &'static str,
-    variant_descriminant: Option<usize>,
+    /// The opaque [`DiscriminantErased`] for this variant
+    variant_discriminant: DiscriminantErased,
+    /// The numeric discriminant value for enums that opt into an explicit
+    /// (non Rust) repr
+    variant_discriminant_value: Option<usize>,
   },
   Tuple {
     variant_name: &'static str,
-    variant_descriminant: Option<usize>,
+    /// The opaque [`DiscriminantErased`] for this variant
+    variant_discriminant: DiscriminantErased,
+    /// The numeric discriminant value for enums that opt into an explicit
+    /// (non Rust) repr
+    variant_discriminant_value: Option<usize>,
     field_infos: &'static [AnonymousFieldInfo],
   },
   Struct {
     variant_name: &'static str,
-    variant_descriminant: Option<usize>,
+    /// The opaque [`DiscriminantErased`] for this variant
+    variant_discriminant: DiscriminantErased,
+    /// The numeric discriminant value for enums that opt into an explicit
+    /// (non Rust) repr
+    variant_discriminant_value: Option<usize>,
     field_infos: &'static [NamedFieldInfo],
   },
 }

@@ -23,10 +23,19 @@ pub fn derive_enum(
       let variant_ident = variant.ident.clone();
       let variant_name = variant_ident.to_string();
       match &variant.fields {
-        Fields::Unit => quote! {
-          EnumVariantInfo::Unit {
-            variant_name: #variant_name,
-            variant_descriminant: None,
+        Fields::Unit => {
+          let full_variant_name = quote!(#name::#variant_ident);
+          quote! {
+            {
+              let variant = &#full_variant_name;
+              let variant_discriminant: DiscriminantErased =
+                leak_erase_discriminant(::core::mem::discriminant(variant));
+              EnumVariantInfo::Unit {
+                variant_name: #variant_name,
+                variant_discriminant,
+                variant_discriminant_value: None,
+              }
+            }
           }
         },
         Fields::Unnamed(fields) => {
@@ -52,29 +61,32 @@ pub fn derive_enum(
             .collect::<Vec<_>>();
 
           quote! {
-            EnumVariantInfo::Tuple {
-              variant_name: #variant_name,
-              variant_descriminant: None,
-              field_infos: {
-                let variant = &#full_variant_name(#(#defaults),*);
-
-                match variant {
-                  #full_variant_name(#(ref #field_idents),*) => {
-                    let base = ptr::from_ref(variant) as usize;
-                    #(let #field_idents = ptr::from_ref(#field_idents) as usize;)*
-                    Box::leak(
-                      vec![
-                        #(AnonymousFieldInfo {
-                          field_index: #field_indices,
-                          field_offset: #field_idents - base,
-                          type_info_fn: Provider::<#field_types>::type_info,
-                        },)*
-                      ]
-                      .into_boxed_slice()
-                    )
-                  },
-                  _ => unreachable!()
-                }
+            {
+              let variant = &#full_variant_name(#(#defaults),*);
+              let variant_discriminant: DiscriminantErased
+                = leak_erase_discriminant(::core::mem::discriminant(variant));
+              let field_infos = match variant {
+                #full_variant_name(#(ref #field_idents),*) => {
+                  let base = ptr::from_ref(variant) as usize;
+                  #(let #field_idents = ptr::from_ref(#field_idents) as usize;)*
+                  Box::leak(
+                    vec![
+                      #(AnonymousFieldInfo {
+                        field_index: #field_indices,
+                        field_offset: #field_idents - base,
+                        type_info_fn: Provider::<#field_types>::type_info,
+                      },)*
+                    ]
+                    .into_boxed_slice()
+                  )
+                },
+                _ => unreachable!()
+              };
+              EnumVariantInfo::Tuple {
+                variant_name: #variant_name,
+                variant_discriminant,
+                variant_discriminant_value: None,
+                field_infos,
               }
             }
           }
@@ -106,33 +118,36 @@ pub fn derive_enum(
             .collect::<Vec<_>>();
 
           quote! {
-            EnumVariantInfo::Struct {
-              variant_name: #variant_name,
-              variant_descriminant: None,
-              field_infos: {
-                let variant = &#full_variant_name{#(#field_idents: #defaults),*};
+            {
+              let variant = &#full_variant_name{#(#field_idents: #defaults),*};
+              let variant_discriminant: DiscriminantErased
+                = leak_erase_discriminant(::core::mem::discriminant(variant));
+              let field_infos = match variant {
+                #full_variant_name{
+                  #(#field_idents: ref #field_ident_idents),*
+                } => {
+                  let base = ptr::from_ref(variant) as usize;
+                  #(let #field_ident_idents =
+                    ptr::from_ref(#field_ident_idents) as usize;)*
 
-                match variant {
-                  #full_variant_name{
-                    #(#field_idents: ref #field_ident_idents),*
-                  } => {
-                    let base = ptr::from_ref(variant) as usize;
-                    #(let #field_ident_idents =
-                      ptr::from_ref(#field_ident_idents) as usize;)*
-
-                    Box::leak(
-                      vec![
-                        #(NamedFieldInfo {
-                          field_name: #field_names,
-                          field_offset: #field_ident_idents - base,
-                          type_info_fn: Provider::<#field_types>::type_info,
-                        },)*
-                      ]
-                      .into_boxed_slice(),
-                    )
-                  },
-                  _ => unreachable!(),
-                }
+                  Box::leak(
+                    vec![
+                      #(NamedFieldInfo {
+                        field_name: #field_names,
+                        field_offset: #field_ident_idents - base,
+                        type_info_fn: Provider::<#field_types>::type_info,
+                      },)*
+                    ]
+                    .into_boxed_slice(),
+                  )
+                },
+                _ => unreachable!(),
+              };
+              EnumVariantInfo::Struct {
+                variant_name: #variant_name,
+                variant_discriminant,
+                variant_discriminant_value: None,
+                field_infos,
               }
             }
           }
@@ -155,9 +170,9 @@ pub fn derive_enum(
             ptr,
           },
           ::inspect::type_info::{
-            internal::{Provider, ProviderOfTypeInfo},
+            internal::{Provider, ProviderOfTypeInfo, leak_erase_discriminant},
             TypeInfo, Enum, IdInfo, SizedInfo, EnumInfo, EnumVariantInfo,
-            AnonymousFieldInfo, NamedFieldInfo,
+            AnonymousFieldInfo, NamedFieldInfo, DiscriminantErased,
           },
         };
 
