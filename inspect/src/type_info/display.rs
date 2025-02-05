@@ -256,7 +256,7 @@ impl fmt::Display for TypeInfo {
         ..
       }) => {
         struct DisplayVariant<'v>(&'v EnumVariantInfo);
-        impl<'v> fmt::Display for DisplayVariant<'v> {
+        impl fmt::Display for DisplayVariant<'_> {
           fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             let precision = f.precision().unwrap();
             match self.0 {

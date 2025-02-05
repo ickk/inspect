@@ -83,6 +83,7 @@ fn type_id_matches_regular_struct() {
 fn type_id_matches_regular_struct_with_lifetime() {
   {
     let a: &u8 = &Box::new(1);
+    #[allow(clippy::unnecessary_to_owned)]
     let b: &str = &"Bamboo".to_string();
 
     let s = RegularStructWithLifetimes { a, b };
