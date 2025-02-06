@@ -106,5 +106,5 @@ where
 pub fn leak_erase_discriminant<T: 'static>(
   concrete: Discriminant<T>,
 ) -> DiscriminantErased {
-  DiscriminantErased::new_from_concreate(concrete)
+  DiscriminantErased::leak_erase_discriminant(concrete)
 }

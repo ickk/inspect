@@ -1,6 +1,15 @@
 use {
-  super::*,
-  ::core::{marker::PhantomData, option::Option},
+  crate::type_info::{
+    internal::{ConcurrentMap, Provider, ProviderOfTypeInfo},
+    AnonymousFieldInfo, IdInfo, ItemInfo, Pointer, Primitive, ResultInfo,
+    Sequence, SizedInfo, Std, Tuple, TupleInfo, TypeInfo,
+  },
+  ::core::{
+    any::{type_name, TypeId},
+    marker::PhantomData,
+    mem::{align_of, offset_of, size_of},
+    option::Option,
+  },
   ::std::vec::Vec,
 };
 
@@ -66,14 +75,6 @@ macro_rules! impl_type_info_sized_with_item {
       type StaticTySized = $static_ty;
 
       fn type_info() -> &'static TypeInfo {
-        use {
-          crate::type_info::internal::ConcurrentMap,
-          ::core::{
-            mem::{align_of, size_of},
-            any::{type_name, TypeId},
-          },
-        };
-
         static DICTIONARY: ConcurrentMap<TypeId, &'static TypeInfo> =
           ConcurrentMap::new();
 
@@ -123,14 +124,6 @@ macro_rules! impl_type_info_sized_with_unsized_item {
       type StaticTySized = $static_ty;
 
       fn type_info() -> &'static TypeInfo {
-        use {
-          crate::type_info::internal::ConcurrentMap,
-          ::core::{
-            mem::{align_of, size_of},
-            any::{type_name, TypeId},
-          }
-        };
-
         static DICTIONARY: ConcurrentMap<TypeId, &'static TypeInfo> =
           ConcurrentMap::new();
 
@@ -196,11 +189,6 @@ macro_rules! impl_type_info_unsized_with_item {
       type StaticTySized = ();
 
       fn type_info() -> &'static TypeInfo {
-        use {
-          crate::type_info::internal::ConcurrentMap,
-          ::core::any::{type_name, TypeId},
-        };
-
         static DICTIONARY: ConcurrentMap<TypeId, &'static TypeInfo> =
           ConcurrentMap::new();
 
@@ -244,14 +232,6 @@ where
   >;
 
   fn type_info() -> &'static TypeInfo {
-    use {
-      crate::type_info::internal::ConcurrentMap,
-      ::core::{
-        any::{type_name, TypeId},
-        mem::{align_of, size_of},
-      },
-    };
-
     static DICTIONARY: ConcurrentMap<TypeId, &'static TypeInfo> =
       ConcurrentMap::new();
 
@@ -298,15 +278,11 @@ macro_rules! impl_type_info_tuple {
       fn type_info() -> &'static TypeInfo {
         // ensure the indices are monotonically increasing from 0
         // I'd guess the compiler probably will remove this
-        [$($index ),+].iter().copied().enumerate().for_each(|(e, i)| assert_eq!(e, i));
-
-        use {
-          crate::type_info::internal::ConcurrentMap,
-          ::core::{
-            any::{type_name, TypeId},
-            mem::{align_of, offset_of, size_of},
-          },
-        };
+        [$($index ),+]
+          .iter()
+          .copied()
+          .enumerate()
+          .for_each(|(e, i)| debug_assert_eq!(e, i));
 
         static DICTIONARY: ConcurrentMap<TypeId, &'static TypeInfo> =
           ConcurrentMap::new();
@@ -319,8 +295,8 @@ macro_rules! impl_type_info_tuple {
                 field_index: $index,
                 field_offset: offset_of!(Self::StaticTy, $index),
                 type_info_fn: Provider::<$generic>::type_info,
-              },)+
-            ]
+              },
+            )+]
             .into_boxed_slice(),
           );
 

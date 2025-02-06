@@ -1,7 +1,8 @@
 use {
-  ::proc_macro2::TokenStream as TokenStream2,
+  crate::type_info::make_static::make_static,
+  ::proc_macro2::{Span, TokenStream as TokenStream2},
   ::quote::{format_ident, quote},
-  ::syn::{DataEnum, Fields, Generics, Ident, Index},
+  ::syn::{DataEnum, Fields, Generics, Ident, Index, Lifetime},
 };
 
 pub fn derive_enum(
@@ -9,12 +10,33 @@ pub fn derive_enum(
   generics: Generics,
   data_enum: &DataEnum,
 ) -> TokenStream2 {
-  if generics.lifetimes().next().is_some()
-    | generics.const_params().next().is_some()
+  if generics.const_params().next().is_some()
     | generics.type_params().next().is_some()
   {
     panic!("Generics are not supported for enums (yet)");
   }
+
+  if generics.type_params().next().is_none() {
+    derive_regular_enum(name, generics, data_enum)
+  } else {
+    panic!("Generics are not supported for enums (yet)");
+  }
+}
+
+fn derive_regular_enum(
+  name: Ident,
+  generics: Generics,
+  data_enum: &DataEnum,
+) -> TokenStream2 {
+  let generic_lifetimes = generics
+    .lifetimes()
+    .map(|param| param.lifetime.clone())
+    .collect::<Vec<_>>();
+  let static_lifetimes = generic_lifetimes
+    .iter()
+    .map(|_| Lifetime::new("'static", Span::call_site()));
+  let full_name = quote!(#name<#(#generic_lifetimes),*>);
+  let full_name_static = quote!(#name<#(#static_lifetimes),*>);
 
   let variant_info_tokenstreams = data_enum
     .variants
@@ -59,6 +81,11 @@ pub fn derive_enum(
             .iter()
             .map(|field| field.ty.clone())
             .collect::<Vec<_>>();
+          let field_types_static = {
+            let mut f = field_types.clone();
+            f.iter_mut().for_each(make_static);
+            f
+          };
 
           quote! {
             {
@@ -74,7 +101,7 @@ pub fn derive_enum(
                       #(AnonymousFieldInfo {
                         field_index: #field_indices,
                         field_offset: #field_idents - base,
-                        type_info_fn: Provider::<#field_types>::type_info,
+                        type_info_fn: Provider::<#field_types_static>::type_info,
                       },)*
                     ]
                     .into_boxed_slice()
@@ -116,6 +143,11 @@ pub fn derive_enum(
             .iter()
             .map(|field| field.ty.clone())
             .collect::<Vec<_>>();
+          let field_types_static = {
+            let mut f = field_types.clone();
+            f.iter_mut().for_each(make_static);
+            f
+          };
 
           quote! {
             {
@@ -135,7 +167,7 @@ pub fn derive_enum(
                       #(NamedFieldInfo {
                         field_name: #field_names,
                         field_offset: #field_ident_idents - base,
-                        type_info_fn: Provider::<#field_types>::type_info,
+                        type_info_fn: Provider::<#field_types_static>::type_info,
                       },)*
                     ]
                     .into_boxed_slice(),
@@ -157,10 +189,11 @@ pub fn derive_enum(
     .collect::<Vec<_>>();
 
   quote! {
-    unsafe impl ::inspect::type_info::internal::ProviderOfTypeInfo<#name>
-    for ::inspect::type_info::internal::Provider<#name> {
-      type StaticTy = #name;
-      type StaticTySized = #name;
+    unsafe impl<#(#generic_lifetimes),*>
+    ::inspect::type_info::internal::ProviderOfTypeInfo<#full_name>
+    for ::inspect::type_info::internal::Provider<#full_name> {
+      type StaticTy = #full_name_static;
+      type StaticTySized = #full_name_static;
 
       fn type_info() -> &'static TypeInfo {
         use {
@@ -174,29 +207,34 @@ pub fn derive_enum(
             TypeInfo, Enum, IdInfo, SizedInfo, EnumInfo, EnumVariantInfo,
             AnonymousFieldInfo, NamedFieldInfo, DiscriminantErased,
           },
+          ::std::sync::LazyLock,
         };
 
-        let variant_infos = Box::leak(
-          vec![
-            #(#variant_info_tokenstreams,)*
-          ]
-          .into_boxed_slice(),
-        );
+        static INFO: LazyLock<TypeInfo> = LazyLock::new(|| {
+          let variant_infos = Box::leak(
+            vec![
+              #(#variant_info_tokenstreams,)*
+            ]
+            .into_boxed_slice(),
+          );
 
-        let type_id = TypeId::of::<#name>();
-        let info = TypeInfo::Enum(Enum::Enum {
-          id: IdInfo {
-            type_id,
-            type_name: type_name::<#name>(),
-          },
-          sized: SizedInfo {
-            size: size_of::<#name>(),
-            align: align_of::<#name>(),
-          },
-          variants: EnumInfo { variant_infos },
+          let type_id = TypeId::of::<#name>();
+          let info = TypeInfo::Enum(Enum::Enum {
+            id: IdInfo {
+              type_id,
+              type_name: type_name::<#name>(),
+            },
+            sized: SizedInfo {
+              size: size_of::<#name>(),
+              align: align_of::<#name>(),
+            },
+            variants: EnumInfo { variant_infos },
+          });
+
+          info
         });
 
-        Box::leak(Box::new(info))
+        &INFO
       }
     }
   }

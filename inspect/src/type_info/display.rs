@@ -259,6 +259,7 @@ impl fmt::Display for TypeInfo {
         impl fmt::Display for DisplayVariant<'_> {
           fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             let precision = f.precision().unwrap();
+            let alternate = f.alternate();
             match self.0 {
               EnumVariantInfo::Unit { variant_name, .. } => {
                 f.write_str(variant_name)
@@ -270,12 +271,19 @@ impl fmt::Display for TypeInfo {
               } => {
                 let mut tuple = f.debug_tuple(variant_name);
                 for field in field_infos.iter() {
-                  tuple.field(&format_args!(
-                    "/*{}*/ {:.*}",
-                    field.field_offset,
-                    precision,
-                    (field.type_info_fn)(),
-                  ));
+                  if alternate {
+                    tuple.field(&format_args!(
+                      "{:#.*}",
+                      precision,
+                      (field.type_info_fn)(),
+                    ));
+                  } else {
+                    tuple.field(&format_args!(
+                      "{:.*}",
+                      precision,
+                      (field.type_info_fn)(),
+                    ));
+                  }
                 }
                 tuple.finish()
               },
@@ -286,15 +294,25 @@ impl fmt::Display for TypeInfo {
               } => {
                 let mut structure = f.debug_struct(variant_name);
                 for field in field_infos.iter() {
-                  structure.field(
-                    field.field_name,
-                    &format_args!(
-                      "/*{}*/ {:.*}",
-                      field.field_offset,
-                      precision,
-                      (field.type_info_fn)(),
-                    ),
-                  );
+                  if alternate {
+                    structure.field(
+                      field.field_name,
+                      &format_args!(
+                        "{:#.*}",
+                        precision,
+                        (field.type_info_fn)(),
+                      ),
+                    );
+                  } else {
+                    structure.field(
+                      field.field_name,
+                      &format_args!(
+                        "{:.*}",
+                        precision,
+                        (field.type_info_fn)(),
+                      ),
+                    );
+                  }
                 }
                 structure.finish()
               },
@@ -305,11 +323,19 @@ impl fmt::Display for TypeInfo {
         f.write_fmt(format_args!("{short_name} "))?;
         let mut set = f.debug_set();
         for variant in variant_infos.iter() {
-          set.entry(&format_args!(
-            "{:.*}",
-            precision,
-            DisplayVariant(variant)
-          ));
+          if alternate {
+            set.entry(&format_args!(
+              "{:#.*}",
+              precision,
+              DisplayVariant(variant)
+            ));
+          } else {
+            set.entry(&format_args!(
+              "{:.*}",
+              precision,
+              DisplayVariant(variant)
+            ));
+          }
         }
         set.finish()
       },

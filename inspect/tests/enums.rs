@@ -11,9 +11,31 @@ enum MyEnum {
   Three { f0: usize, f1: Vec<u8> },
 }
 
+#[allow(unused)]
+#[derive(TypeInfo)]
+enum EnumWithLifetime<'s, 't> {
+  One,
+  Two(Vec<&'s [&'s str]>, &'t str),
+  Three { f0: &'t str, f1: Vec<&'s [&'s str]> },
+}
+
 #[test]
 fn type_id_matches_enum() {
   assert_eq!(TypeInfo::of::<MyEnum>().type_id(), TypeId::of::<MyEnum>());
+}
+
+#[test]
+fn type_id_matches_enum_with_lifetime() {
+  let string = String::new() + "spaghetti";
+  let slice: Vec<&str> = vec![&string];
+  let slice: &[&str] = &slice;
+
+  let my_enum = EnumWithLifetime::Two(vec![slice], &string);
+
+  assert_eq!(
+    TypeInfo::of_val(&my_enum).type_id(),
+    TypeId::of::<EnumWithLifetime<'static, 'static>>()
+  );
 }
 
 #[test]

@@ -1,5 +1,3 @@
-//! Shenanigans to erase the type parameter from [`::core::mem::Discriminant`]
-
 use ::core::{
   any::Any,
   fmt::Debug,
@@ -7,12 +5,13 @@ use ::core::{
   mem::Discriminant,
 };
 
+/// Shenanigans to erase the type parameter from [`::core::mem::Discriminant`]
 #[derive(Debug, Clone, Copy)]
 pub struct DiscriminantErased(&'static dyn DiscriminantDyn);
 impl DiscriminantErased {
   /// This creates a `DiscriminantErased` from a `Discriminant<T>`. It's
   /// exported for macro use by `internal::leak_erase_discriminant`
-  pub(crate) fn new_from_concreate<E>(concrete: Discriminant<E>) -> Self
+  pub(crate) fn leak_erase_discriminant<E>(concrete: Discriminant<E>) -> Self
   where
     E: 'static,
   {
